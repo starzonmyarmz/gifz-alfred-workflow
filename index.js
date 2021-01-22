@@ -7,7 +7,6 @@ const items = alfy
 	.inputMatches(data, 'keywords')
 	.map(element => ({
 		title: element.keywords,
-		subtitle: element.url,
     arg: gifz + element.url
 	}))
 
