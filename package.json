@@ -1,14 +1,9 @@
 {
-  "name": "user.workflow.D4F1F597-CE86-4CF2-A078-01919EFB5EB5",
+  "name": "gifz-alfred-workflow",
   "version": "1.0.0",
-  "description": "",
+  "description": "Alfred workflow for searching my personal collection of gifs",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Daniel Marino",
   "dependencies": {
     "alfy": "^0.10.0"
   }
