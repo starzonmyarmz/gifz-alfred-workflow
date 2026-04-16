@@ -5,18 +5,32 @@ import sys
 import tempfile
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 BASE_URL = "https://gifz.netlify.app/"
 DATA_URL = BASE_URL + "gifs.json"
 CACHE_TTL = 3600
 CACHE_FILE = "gifs.json"
+THUMB_DIR = "thumbs"
 FETCH_TIMEOUT = 5
+THUMB_TIMEOUT = 5
+THUMB_WORKERS = 8
+
+
+def cache_root():
+    root = os.environ.get("alfred_workflow_cache") or tempfile.gettempdir()
+    os.makedirs(root, exist_ok=True)
+    return root
 
 
 def cache_path():
-    root = os.environ.get("alfred_workflow_cache") or tempfile.gettempdir()
-    os.makedirs(root, exist_ok=True)
-    return os.path.join(root, CACHE_FILE)
+    return os.path.join(cache_root(), CACHE_FILE)
+
+
+def thumb_dir():
+    path = os.path.join(cache_root(), THUMB_DIR)
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def load_cache(path):
@@ -35,8 +49,8 @@ def save_cache(path, data):
         pass
 
 
-def fetch():
-    req = urllib.request.Request(DATA_URL, headers={"User-Agent": "gifz-alfred"})
+def fetch_json(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "gifz-alfred"})
     with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as resp:
         return json.load(resp)
 
@@ -47,13 +61,34 @@ def get_data():
     if cached is not None and time.time() - mtime < CACHE_TTL:
         return cached, None
     try:
-        data = fetch()
+        data = fetch_json(DATA_URL)
         save_cache(path, data)
         return data, None
     except Exception as err:
         if cached is not None:
             return cached, None
         return None, err
+
+
+def ensure_thumb(thumb_rel):
+    local = os.path.join(thumb_dir(), os.path.basename(thumb_rel))
+    if os.path.exists(local) and os.path.getsize(local) > 0:
+        return local
+    try:
+        req = urllib.request.Request(BASE_URL + thumb_rel, headers={"User-Agent": "gifz-alfred"})
+        with urllib.request.urlopen(req, timeout=THUMB_TIMEOUT) as resp:
+            tmp = local + ".part"
+            with open(tmp, "wb") as f:
+                f.write(resp.read())
+            os.replace(tmp, local)
+        return local
+    except Exception:
+        return None
+
+
+def prefetch_thumbs(thumb_rels):
+    with ThreadPoolExecutor(max_workers=THUMB_WORKERS) as pool:
+        pool.map(ensure_thumb, thumb_rels)
 
 
 def main():
@@ -72,11 +107,22 @@ def main():
         json.dump({"items": []}, sys.stdout)
         return
 
-    items = [
-        {"title": item["keywords"], "arg": BASE_URL + item["url"]}
-        for item in data
-        if query in item["keywords"].lower()
-    ]
+    matches = [item for item in data if query in item["keywords"].lower()]
+
+    thumb_rels = [m["thumb"] for m in matches if m.get("thumb")]
+    if thumb_rels:
+        prefetch_thumbs(thumb_rels)
+
+    items = []
+    for m in matches:
+        entry = {"title": m["keywords"], "arg": BASE_URL + m["url"]}
+        thumb_rel = m.get("thumb")
+        if thumb_rel:
+            local = os.path.join(thumb_dir(), os.path.basename(thumb_rel))
+            if os.path.exists(local) and os.path.getsize(local) > 0:
+                entry["icon"] = {"path": local}
+        items.append(entry)
+
     json.dump({"items": items}, sys.stdout)
 
 
