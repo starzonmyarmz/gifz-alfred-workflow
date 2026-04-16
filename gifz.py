@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -49,6 +50,10 @@ def save_cache(path, data):
         pass
 
 
+def clear_thumbs():
+    shutil.rmtree(thumb_dir(), ignore_errors=True)
+
+
 def fetch_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": "gifz-alfred"})
     with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as resp:
@@ -63,6 +68,7 @@ def get_data():
     try:
         data = fetch_json(DATA_URL)
         save_cache(path, data)
+        clear_thumbs()
         return data, None
     except Exception as err:
         if cached is not None:
@@ -109,18 +115,16 @@ def main():
 
     matches = [item for item in data if query in item["keywords"].lower()]
 
-    thumb_rels = [m["thumb"] for m in matches if m.get("thumb")]
+    thumb_rels = ["t/" + m["url"] for m in matches]
     if thumb_rels:
         prefetch_thumbs(thumb_rels)
 
     items = []
     for m in matches:
-        entry = {"title": m["keywords"], "arg": BASE_URL + m["url"]}
-        thumb_rel = m.get("thumb")
-        if thumb_rel:
-            local = os.path.join(thumb_dir(), os.path.basename(thumb_rel))
-            if os.path.exists(local) and os.path.getsize(local) > 0:
-                entry["icon"] = {"path": local}
+        entry = {"title": m["keywords"], "arg": BASE_URL + "g/" + m["url"]}
+        local = os.path.join(thumb_dir(), os.path.basename(m["url"]))
+        if os.path.exists(local) and os.path.getsize(local) > 0:
+            entry["icon"] = {"path": local}
         items.append(entry)
 
     json.dump({"items": items}, sys.stdout)

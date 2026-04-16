@@ -22,11 +22,13 @@ Never print anything else to stdout. Send logs/diagnostics to stderr.
 
 ## Data source
 
-`https://gifz.netlify.app/gifs.json` — array of objects shaped `{"keywords": str, "url": str}`. `url` is relative; prepend `https://gifz.netlify.app/` for the final `arg`.
+`https://gifz.netlify.app/gifs.json` — array of objects shaped `{"keywords": str, "url": str}`. `url` is a bare filename. Full gif URL is `https://gifz.netlify.app/g/<url>` (used for the copy `arg`). Thumbnail URL is `https://gifz.netlify.app/t/<url>` (used for the result icon).
 
 ## Cache
 
 Disk cache at `$alfred_workflow_cache/gifs.json` (Alfred sets this env var; falls back to `tempfile.gettempdir()`). TTL 1 hour. On fetch failure with a stale cache present, serve stale. On fetch failure with no cache, emit a single error item (`valid: false`) so the user sees the problem.
+
+Thumbnails cached at `$alfred_workflow_cache/thumbs/<filename>`. When `gifs.json` is refreshed from the network, the thumbs directory is cleared so resized/updated thumbnails get re-fetched.
 
 ## Rebuilding `Gifz.alfredworkflow`
 
